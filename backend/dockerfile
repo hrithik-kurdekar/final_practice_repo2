@@ -1,0 +1,39 @@
+# ---- Stage-1: Dependency Build -----
+
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+ENV PYTHONBUFFERED=1 \
+    PYTHONWRITEBYTECODE=1
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+
+RUN pip install -r requirements.txt
+
+
+# ---- Stage-2: Image Build
+FROM python:3.11-slim
+
+ENV PYTHONBUFFERED=1 \
+    PYTHONWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /voting_app_backend
+
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
+RUN chown -R appuser:appgroup /voting_app_backend
+
+COPY --from=builder --chown=appuser:appgroup /opt/venv /opt/venv
+COPY --chown=appuser:appgroup ./app ./app
+
+EXPOSE 8000
+
+USER appuser
+
+ENTRYPOINT [ "uvicorn" ]
+CMD ["app.main:app", "--host", "0.0.0.0", "--port", "8000"]
